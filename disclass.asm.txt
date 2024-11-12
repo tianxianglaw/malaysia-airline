@@ -1,0 +1,686 @@
+.MODEL SMALL
+.STACK 64
+.DATA
+
+;----------------------------------------------------------------------------------------------
+
+    	SEPARATOR1          DB      "     --------------------------------------",10,13,"$"
+    	QUIT                DB      "     Enter [Q] to quit the program       ",10,13,"$"
+    	RETURN              DB      "     Enter [R] to return                 ",10,13,"$"
+    	SKIP		DB	"     Enter [S] to skip       ",10,13,"$"
+    	NOTE                DB      10,13," Note: The discount calculation rounds off the cents.",10,13,"$"
+
+    	HEADER1			DB		"     |        Please Select A Class           |",10,13,"$"
+    	TICKET1		        DB		"     |     [1] Business         |  RM600      |",10,13,"$"	
+    	TICKET2		        DB		"     |     [2] Premium Business |  RM800      |",10,13,"$"
+    	INPUT_1	          	DB		"Enter A Ticket No (1 Or 2) >> ","$"
+
+    	HEADER2			DB		"     |        Do You Want To Add Meal?      |",10,13,"$"
+    	ADDON1		        DB		"     |     [1] Nasi Lemak      |  RM15      |",10,13,"$"	
+    	ADDON2		        DB		"     |     [2] Chichken Rice   |  RM18      |",10,13,"$"	
+    	ADDON3		        DB		"     |     [3] Beef Burger     |  RM25      |",10,13,"$"	
+    	INPUT_2	           	DB		"Enter A Code To Add Meal (1, 2 Or 3) >> ","$"
+
+    	HEADER3			DB		"     |               Promo Code             |",10,13,"$"
+    	PROMO1		        DB		"     |     [1] cuti123         |  5%  	    |",10,13,"$"	
+    	PROMO2		        DB		"     |     [2] jimat           |  15%       |",10,13,"$"
+    	PROMO3		        DB		"     |     [3] kiatravel       |  25%       |",10,13,"$"
+    	PROMO4		        DB		"     |     [4] Happyfly        |  35%       |",10,13,"$"
+    	PROMO5		        DB		"     |     [5] Safeflight      |  45%       |",10,13,"$"
+    	INPUT_3	           	DB		"Enter A Promo Code (1, 2, 3, 4 Or 5) >> ","$"
+
+    	RECEIPT_HEADER          DB      "                   RECEIPT",10,13,"$"
+    	RECEIPT_TICKET_PRICE    DB      "     Ticket Price      : RM $"
+    	RECEIPT_ADD_ON          DB      "     Add On Price      : RM $"
+    	RECEIPT_VOUCHER         DB      "     Voucher used      : $"
+    	RECEIPT_DISC_AMT        DB      "     Discount Amount   : RM $"
+    	RECEIPT_ORI_PRICE       DB      "     Total Price       : RM $"
+    	RECEIPT_TOTAL           DB      "     Total Price after discount   : RM $"
+
+    	INVALID_CODE       	    DB      "Invalid promo code! Please Enter 1, 2, 3, 4 ,5 Only.",10,13,"$"
+    	INVALID_MEAL	    DB	    "Invalid meal code! Please Enter 1, 2 Or 3 Only.",10,13,"$"
+    	INVALID_INPUT           DB      "Error Input. Please Enter 1 Or 2 Only.",10,13,"$"
+
+    	TICKET1_PRICE       DW      600
+    	TICKET2_PRICE       DW      800
+    	ADDON1_PRICE        DW      15
+    	ADDON2_PRICE        DW      18
+    	ADDON3_PRICE        DW      25
+    	CODE1               DB      "CUTI123 (5%)",10,13,"$"
+    	CODE2               DB      "JIMAT (15%)",10,13,"$"
+    	CODE3               DB      "KIATRAVEL (25%)",10,13,"$"
+    	CODE4               DB      "HAPPYFLY (35%)",10,13,"$"
+    	CODE5               DB      "SAFEFLIGHT (45%)",10,13,"$"
+
+    	TICKET              DW      ?
+    	ORI_PRICE           DW      ?
+    	DISCOUNT_AMT        DW      ?
+    	FINAL_PRICE         DW      ?
+    	ADDON_PRICE         DW      ?
+    	NO_ADD_ON           DW      0
+    	NO_PROMO	    DW	    0
+    	VOUCHER             DB      20 DUP('$') 
+    
+    	CR      EQU 0DH
+    	LF      EQU 0AH
+;----------------------------------------------------------------------------------------------
+
+.CODE
+	MAIN PROC FAR
+	
+	MOV AX,@DATA
+	MOV DS,AX
+
+    	CALL SELECT_TICKET
+
+SELECT_TICKET PROC 
+
+    	CALL CLS
+    	CALL NEWLINE
+
+	MOV AH,09H					
+	LEA DX,SEPARATOR1           
+	INT 21H		
+	LEA DX,HEADER1				
+	INT 21H
+	LEA DX,TICKET1          
+	INT 21H	
+	LEA DX,TICKET2  		
+	INT 21H
+	LEA DX,SEPARATOR1           
+	INT 21H		
+
+    	CALL NEWLINE
+
+	MOV AH,09H					; [Q] quit 
+	LEA DX,QUIT
+	INT 21H
+
+   	CALL NEWLINE
+
+  TICKET_INPUT:                 			; prompt out msg and input
+
+	MOV AH,09H	
+	LEA DX,INPUT_1				
+	INT 21H
+
+	MOV AH,01H					
+	INT 21H
+
+;Check for S,Q,R and Convert Lower To Upper Case So Reduce Validation
+     	CMP AL, 'a'
+     	JL CHECK_INPUT1              			; If less than 'a', skip conversion go check input
+ 
+     	CMP AL, 'z'
+     	JG CHECK_INPUT1              			; If greater than 'z', skip conversion go check input
+ 
+     	SUB AL, 20H                 			; Convert lowercase to uppercase
+
+; after convert to uppercase , NOW VALIDATION
+  CHECK_INPUT1:
+
+	CMP AL,'1'					; 1==business
+	JE SELECT_TICKET1
+
+	CMP AL,'2'					; 2==premium
+	JE SELECT_TICKET2
+
+	CMP AL,'Q'				    	; Q== quit 
+   	JE EXIT1;   
+
+    	JMP ERROR_INPUT1				; if not 1,2,Q jump wrong input
+
+  SELECT_TICKET1:		    			; for business
+    	MOV AX, TICKET1_PRICE
+    	MOV TICKET,AX               			; ticket price=600, store 600 in ticket for later calculation
+   	MOV AX, TICKET1_PRICE
+    	MOV ORI_PRICE, AX           			; also store in ori price (total price without discount)
+    	CALL SELECT_ADD_ON
+	
+  SELECT_TICKET2:		    			; for premium
+    	MOV AX, TICKET2_PRICE
+    	MOV TICKET,AX               			; ticket_\ price=800, store 800 in ticket for later calculation
+    	MOV AX, TICKET2_PRICE
+    	MOV ORI_PRICE, AX           			; also store in ori price (total price without discount)
+   	CALL SELECT_ADD_ON
+
+  EXIT1:
+    	CALL EXIT
+
+  ERROR_INPUT1:
+	CALL NEWLINE
+    	MOV AH,09H					; if not 1,2,Q jump here and display wrong msg
+	LEA DX,INVALID_INPUT
+	INT 21H	
+    	JMP TICKET_INPUT				; jmp back ticket_input to accept input
+
+    	RET
+SELECT_TICKET ENDP 
+
+SELECT_ADD_ON PROC 
+
+    	CALL CLS
+    	CALL NEWLINE
+
+	MOV AH,09H					
+	LEA DX,SEPARATOR1           			
+	INT 21H		
+	LEA DX,HEADER2				
+	INT 21H
+	LEA DX,ADDON1           
+	INT 21H	
+	LEA DX,ADDON2  		
+	INT 21H
+	LEA DX,ADDON3
+	INT 21H
+	LEA DX,SEPARATOR1           
+	INT 21H		
+
+    	CALL NEWLINE
+
+	MOV AH,09H					; [S] skip
+	LEA DX,SKIP
+	INT 21H
+
+
+	MOV AH,09H					; [R] return
+	LEA DX,RETURN
+	INT 21H
+    
+	MOV AH,09H					; [Q] quit 
+	LEA DX,QUIT
+	INT 21H
+
+    	CALL NEWLINE
+
+  ADDON_INPUT:                 				; prompt out msg and input
+ 
+
+	MOV AH,09H	
+	LEA DX,INPUT_2		
+	INT 21H
+
+	MOV AH,01H			
+	INT 21H
+
+;Check for S,Q,R and Convert Lower To Upper Case So Reduce Validation
+     	CMP AL, 'a'
+     	JL CHECK_INPUT2              		; If less than 'a', skip conversion
+ 
+    	CMP AL, 'z'
+     	JG CHECK_INPUT2              		; If greater than 'z', skip conversion
+ 
+     	SUB AL, 20H                 		; Convert lowercase to uppercase
+
+;Validation
+  CHECK_INPUT2:
+
+	CMP AL, '1'
+    	JE MEAL_NASI_LEMAK
+
+   	CMP AL, '2'
+   	JE MEAL_CHICKEN_RICE 
+
+   	CMP AL, '3'
+   	JE MEAL_BEEF_BURGER
+
+	CMP AL,'Q'				       	
+	JE EXIT2;   
+
+	CMP AL,'R'				  
+   	JE RET1;
+
+	CMP AL,'S'				  
+   	JE SKIP1;
+
+    	JMP ERROR_INPUT2
+
+ MEAL_NASI_LEMAK:
+    	MOV AX, ADDON1_PRICE           		; nasi lemak = 15 store in add on price
+    	MOV ADDON_PRICE,AX
+    	MOV AX, ORI_PRICE
+    	ADD AX, ADDON1_PRICE            	; original price = ticket price + add on price
+    	MOV ORI_PRICE, AX  
+    	CALL SELECT_PROMO
+
+  MEAL_CHICKEN_RICE:
+    	MOV AX, ADDON2_PRICE           		; Chicken rice = 18 store in add on price
+    	MOV AX, ORI_PRICE
+    	ADD AX, ADDON2_PRICE            	; original price = ticket price + add on price
+    	MOV ORI_PRICE, AX  
+    	CALL SELECT_PROMO
+
+MEAL_BEEF_BURGER:
+    	MOV AX, ADDON3_PRICE           		; Beef burger = 25 store in add on price
+    	MOV ADDON_PRICE,AX
+    	MOV AX, ORI_PRICE
+    	ADD AX, ADDON3_PRICE            	; original price = ticket price + add on price
+    	MOV ORI_PRICE, AX  
+    	CALL SELECT_PROMO
+
+  EXIT2:
+    	CALL EXIT
+
+  RET1:
+    	CALL SELECT_TICKET
+
+  SKIP1:
+    	MOV AX, NO_ADD_ON			; no add on = 0
+    	MOV ADDON_PRICE,AX
+    	MOV AX, ORI_PRICE
+    	ADD AX, NO_ADD_ON            		; original price = ticket price + add on price(0)
+    	MOV ORI_PRICE, AX 
+    	CALL SELECT_PROMO
+
+  ERROR_INPUT2:
+	CALL NEWLINE
+    	MOV AH,09H				; display error message
+	LEA DX,INVALID_MEAL
+	INT 21H	       
+    	JMP  ADDON_INPUT
+
+    	RET
+SELECT_ADD_ON ENDP
+
+SELECT_PROMO PROC 
+
+   	CALL CLS
+    	CALL NEWLINE
+
+    	MOV AH,09H					
+    	LEA DX,SEPARATOR1         
+   	INT 21H		
+    	LEA DX,HEADER3				
+    	INT 21H
+    	LEA DX,PROMO1          
+    	INT 21H	
+    	LEA DX,PROMO2  			 
+    	INT 21H
+    	LEA DX,PROMO3  			  
+    	INT 21H
+    	LEA DX,PROMO4  			  
+    	INT 21H
+    	LEA DX,PROMO5  			  
+    	INT 21H
+    	LEA DX,SEPARATOR1         
+    	INT 21H		
+    	CALL NEWLINE
+
+    	MOV AH,09H					; [Q] quit 
+    	LEA DX,QUIT
+    	INT 21H
+
+    	MOV AH,09H					; [R] return
+   	LEA DX,RETURN
+    	INT 21H
+    	CALL NEWLINE
+
+    
+  PROMO_INPUT:                 				; prompt out msg and display
+
+	MOV AH,09H	
+	LEA DX,INPUT_3		
+	INT 21H
+
+	MOV AH,01H			
+	INT 21H
+
+;Check for Q,R and Convert Lower To Upper Case So Reduce Validation
+     	CMP AL, 'a'
+     	JL CHECK_INPUT3              		; If less than 'a', skip conversion
+ 
+     	CMP AL, 'z'
+     	JG CHECK_INPUT3              		; If greater than 'z', skip conversion
+ 
+    	SUB AL, 20H                 		; Convert lowercase to uppercase
+
+;validation
+
+  CHECK_INPUT3:
+
+	CMP AL, '1'
+    	JE PROMO_1
+
+	CMP AL, '2'
+    	JE PROMO_2
+
+    	CMP AL, '3'
+    	JE PROMO_3 
+
+    	CMP AL, '4'
+    	JE PROMO_4 
+
+    	CMP AL, '5'
+    	JE PROMO_5   
+
+	CMP AL,'Q'				    
+   	JE EXIT3;   
+
+	CMP AL,'R'				  
+   	JE RET2;
+
+    	JMP ERROR_INPUT3
+
+  PROMO_1:
+    	CALL APPLY_5_PERCENT
+    	CALL PRINT_RECEIPT
+    	CALL EXIT
+ 
+
+  PROMO_2:
+    	CALL APPLY_15_PERCENT
+    	CALL PRINT_RECEIPT
+    	CALL EXIT
+ 
+  PROMO_3:
+    	CALL APPLY_25_PERCENT
+    	CALL PRINT_RECEIPT
+    	CALL EXIT
+  
+  PROMO_4:
+    	CALL APPLY_35_PERCENT
+    	CALL PRINT_RECEIPT
+    	CALL EXIT
+
+  PROMO_5:
+    	CALL APPLY_45_PERCENT
+    	CALL PRINT_RECEIPT
+    	CALL EXIT
+
+  EXIT3:
+    	CALL EXIT
+
+  RET2:
+    	CALL SELECT_ADD_ON
+
+  ERROR_INPUT3:
+	CALL NEWLINE
+    	MOV AH,09H						; display error message
+	LEA DX,INVALID_CODE
+	INT 21H	      
+    	JMP PROMO_INPUT
+
+    	RET
+SELECT_PROMO ENDP
+
+APPLY_5_PERCENT PROC
+
+    	LEA DI, VOUCHER						;Copy string by compare 1 by 1
+    	LEA SI, CODE1
+    	CALL CopyString
+    	LEA DX, VOUCHER
+
+    	MOV AX, ORI_PRICE
+    
+    	; Calculate 5% discount					;ori = ticket+meal 
+    	MOV CX,5						;calc 5%
+    	MUL CX
+    	MOV CX,100
+    	DIV CX                       
+
+    	; Store discount result in discount value
+    	MOV DISCOUNT_AMT, AX					;take quotient as discount amount
+
+    	MOV AX, ORI_PRICE                   
+    	SUB AX, DISCOUNT_AMT
+    	MOV FINAL_PRICE, AX					;Final = ori - discount
+	
+    	RET
+APPLY_5_PERCENT ENDP
+
+APPLY_15_PERCENT PROC
+
+    	LEA DI, VOUCHER
+    	LEA SI, CODE2
+    	CALL CopyString
+    	LEA DX, VOUCHER
+
+    	MOV AX, ORI_PRICE
+    
+    	; Calculate 15% discount
+    	MOV CX,15
+    	MUL CX
+   	MOV CX,100
+   	DIV CX                       
+
+    	; Store discount result in discount value
+    	MOV DISCOUNT_AMT, AX
+
+    	MOV AX, ORI_PRICE                   
+    	SUB AX, DISCOUNT_AMT
+    	MOV FINAL_PRICE, AX
+
+    	RET
+APPLY_15_PERCENT ENDP
+
+APPLY_25_PERCENT PROC
+
+    	LEA DI, VOUCHER
+    	LEA SI, CODE3
+    	CALL CopyString
+    	LEA DX, VOUCHER
+
+    	MOV AX, ORI_PRICE
+    
+    	; Calculate 25% discount
+    	MOV CX,25
+    	MUL CX
+    	MOV CX,100
+    	DIV CX                       
+
+    	; Store discount result in discount value
+    	MOV DISCOUNT_AMT, AX
+
+   	MOV AX, ORI_PRICE                   
+    	SUB AX, DISCOUNT_AMT
+    	MOV FINAL_PRICE, AX
+
+    	RET
+APPLY_25_PERCENT ENDP
+
+APPLY_35_PERCENT PROC
+
+    	LEA DI, VOUCHER
+    	LEA SI, CODE4
+    	CALL CopyString
+    	LEA DX, VOUCHER
+    	MOV AX, ORI_PRICE
+    
+    	; Calculate 35% discount
+    	MOV CX,35
+    	MUL CX
+    	MOV CX,100
+    	DIV CX                       
+
+    	; Store discount result in discount value
+    	MOV DISCOUNT_AMT, AX
+
+    	MOV AX, ORI_PRICE                   
+    	SUB AX, DISCOUNT_AMT
+    	MOV FINAL_PRICE, AX
+
+    	RET
+
+APPLY_35_PERCENT ENDP
+
+APPLY_45_PERCENT PROC
+
+    	LEA DI, VOUCHER
+    	LEA SI, CODE5
+    	CALL CopyString
+    	LEA DX, VOUCHER
+
+    	MOV AX, ORI_PRICE
+    	
+    	; Calculate 45% discount
+    	MOV CX,45
+    	MUL CX
+    	MOV CX,100
+    	DIV CX                       
+
+    	; Store discount result in discount value
+    	MOV DISCOUNT_AMT, AX
+
+    	MOV AX, ORI_PRICE                   
+    	SUB AX, DISCOUNT_AMT
+    	MOV FINAL_PRICE, AX
+
+    	RET
+APPLY_45_PERCENT ENDP
+
+
+
+PRINT_RECEIPT PROC
+
+    	CALL CLS
+    	CALL NEWLINE
+
+	MOV AH,09H					
+	LEA DX,SEPARATOR1           
+	INT 21H	
+	LEA DX,RECEIPT_HEADER
+	INT 21H	
+    	MOV AH,09H
+	LEA DX,SEPARATOR1           
+	INT 21H		
+
+    	MOV AH, 09H					
+	LEA DX,RECEIPT_TICKET_PRICE	
+	INT 21H
+    	MOV AX,TICKET					; Ticket price (600/800)
+    	CALL CONVERT_TO_DECIMAL      			; Convert result to decimal and print
+ 	CALL NEWLINE
+
+    	MOV AH, 09H
+    	LEA DX,RECEIPT_ADD_ON	
+	INT 21H
+    	MOV AX,ADDON_PRICE				; Add on (15/18/25/0)
+    	CALL CONVERT_TO_DECIMAL      			; Convert result to decimal and print	
+    	CALL NEWLINE
+
+    	MOV AH, 09H
+    	LEA DX, RECEIPT_VOUCHER
+    	INT 21H						
+    	LEA DX,VOUCHER     				; from just now copy string
+    	INT 21H
+
+    	MOV AH, 09H
+	LEA DX,RECEIPT_DISC_AMT	
+	INT 21H
+    	MOV AX,DISCOUNT_AMT				
+    	CALL CONVERT_TO_DECIMAL      			; Convert result to decimal and print	
+    	CALL NEWLINE
+    
+    	MOV AH, 09H
+	LEA DX,RECEIPT_ORI_PRICE	
+	INT 21H
+    	MOV AX,ORI_PRICE				; ori = price without discount
+    	CALL CONVERT_TO_DECIMAL      			; Convert result to decimal and print	
+   	CALL NEWLINE
+
+    	MOV AH, 09H
+    	LEA DX,RECEIPT_TOTAL	
+	INT 21H
+    	MOV AX,FINAL_PRICE				 ; final = price alr discount
+    	CALL CONVERT_TO_DECIMAL     			 ; Convert result to decimal and print	
+
+   	CALL NEWLINE
+
+	MOV AH,09H					
+	LEA DX,SEPARATOR1           
+	INT 21H		
+
+    	MOV AH,09H				
+	LEA DX,NOTE
+	INT 21H	
+
+    	RET
+PRINT_RECEIPT ENDP
+
+; convert the number in AX to a decimal string and print it
+CONVERT_TO_DECIMAL PROC
+    ; This procedure converts the number in AX to decimal
+    ; Divide by 10 repeatedly to extract digits
+    	MOV CX, 10                 		 ; Divisor (base 10)
+    	XOR BX, BX                 		 ; Clear BX to store reversed digits
+    	XOR DX, DX                 		 ; Clear DX (remainder)
+
+    ; Check if AX is zero
+    	CMP AX, 0
+    	JZ PRINT_ZERO              		 ; If zero, print '0'
+
+
+    ; Extract digits by dividing the number by 10 repeatedly
+    CONVERT_LOOP:
+        XOR DX, DX              		; Clear DX (for remainder)
+        DIV CX                  		; Divide AX by 10 (quotient in AX, remainder in DX)
+        PUSH DX                 		; Store remainder (digit) on the stack
+        INC BX                 			; Increment digit count
+        CMP AX, 0             			; Check if quotient is zero
+        JNZ CONVERT_LOOP       			; Continue convert_loop if not zero
+
+    ; Print digits from the stack in correct order
+    PRINT_DIGITS:
+        POP DX                  	; Pop digit from stack
+        ADD DL, '0'             	; Convert the remainder (digit) to ASCII
+        MOV AH, 02H             	
+        INT 21H                 	; Print the digit
+        DEC BX                  	; Decrement digit count
+        JNZ PRINT_DIGITS        	; Repeat until all digits are printed
+        RET
+
+    PRINT_ZERO:
+        MOV DL, '0'                 ; If AX is zero, print '0'
+        MOV AH, 02H                 ; DOS print character function
+        INT 21H                     ; Print the character
+
+    	RET
+CONVERT_TO_DECIMAL ENDP
+
+
+CopyString PROC
+
+ COPY_LOOP:
+   	MOV AL, [SI]              	; Load a byte from the source string , SI IS STARTING POINT
+    	MOV [DI], AL              	; Store the byte into the destination , DI IS END POINT IS A ADDRESS OPEN THE DOOR TO DATA MASUK
+    	INC SI                    	; Increment source index ,+1+1
+    	INC DI                    	; Increment destination index ,THEN COMPARED UNTIL END OF STRING
+    	CMP AL, '$'               	; Check for the termination character
+    	JNZ COPY_LOOP             	; Repeat until the end of the string
+
+    ; Add the termination character to the end of the destination string
+    	DEC DI                    	; Move DI back to the last written character ,ATAS ALR ADD BUT ACTL NOT SO DEC AND STOP
+    	MOV BYTE PTR [DI], '$'    	; Null-terminate the destination string
+
+    	RET
+CopyString ENDP
+ 
+; clear screen
+ CLS PROC
+    	MOV AH, 06H              	; Scroll up (clear screen)
+    	MOV AL, 00H              	; Scroll the entire screen
+    	MOV BH, 00001111B        	; Attribute for blank lines (white text, black background)
+    	MOV CX, 0000H            	; Top-left corner of the screen
+   	MOV DX, 184FH            	; Bottom-right corner (25 rows, 80 columns)
+    	INT 10H
+    	RET                      	; Return from the function
+ CLS ENDP
+ 
+ ; new line
+ NEWLINE PROC
+	MOV AH,02H
+	MOV DL,CR
+	INT 21H
+	MOV DL,LF
+	INT 21H
+	RET
+ NEWLINE ENDP
+
+;exit
+ EXIT PROC
+	MOV AX,4C00H
+	INT 21H
+ EXIT ENDP
+
+MAIN ENDP
+END MAIN
